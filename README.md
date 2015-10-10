@@ -23,11 +23,14 @@ There are 4 demo applications that can be found in the apps directory:
     BCM4343W/platforms/BCM94343W_AVN/README.txt
 
 ### Visit here for support
+
 [Broadcom Community][df1]
 
 [Avnet Cloudconnectkit][df2]
-    
-[//]: # (These are reference links used in the body of this note and get stripped out when the markdown processor does it's job. There is no need to format nicely because it shouldn't be seen. Thanks SO -
-  
+
+[WICED SDK 3.4.0-AWS][df3]
+
+
+   [df3]:<https://community.broadcom.com/docs/DOC-2484>
    [df1]:<https://community.broadcom.com/welcome>
    [df2]:<http://cloudconnectkits.org/>
