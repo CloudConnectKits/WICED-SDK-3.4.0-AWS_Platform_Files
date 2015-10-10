@@ -1,0 +1,276 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+<title>Broadcom WICED AWS IOT Service</title>
+<style type="text/css">
+.wrapper {
+  /*background: linear-gradient(45deg,rgba(125,185,232,1) 0,rgba(30,87,153,1) 100%);*/
+   background: linear-gradient(45deg,rgba(255,165,0,1) 0,rgba(255,165,0,1) 100%);
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+.wrapper.form-success .container h1 {
+  -webkit-transform: translateY(85px);
+      -ms-transform: translateY(85px);
+          transform: translateY(85px);
+}
+
+.container {
+  margin: 0 auto;
+  text-align: center;
+}
+button, .btn {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  outline: 0;
+  background-color: #16b;
+  text-shadow: 0 1px 1px rgba(0,0,0,0.75);
+  color: white;
+  border: 0;
+  padding: 10px 15px;
+  color: #53e3a6;
+  border-radius: 7px;
+  width: 15%;
+  cursor: pointer;
+  font-size: 14px;
+  -webkit-transition-duration: 0.25s;
+          transition-duration: 0.25s;
+}
+
+</style>
+
+<script type="text/javascript">
+      var progress_run_id = null;
+      var control = null;
+      var cert_transferred = false;
+      var key_transferred = false;
+      var trigger_for_upgrade = null;
+      function progress( prog, current_pos, full_length, trans ) {
+        var node = document.getElementById(prog);
+        var prg_width = parseInt(document.getElementById('progress_plane').style.width);
+        var transferring_stage = current_pos * 100 / full_length;
+        transferring_stage = Math.round(transferring_stage * 10) / 10;
+        var new_progress_bar_position = current_pos * prg_width/full_length;;
+        var w    = node.style.width.match(/\\d+/);
+        if (current_pos == full_length){
+          w = 0;
+          document.getElementById(trans).innerHTML="Transfer completed";
+          node.style.width = 100 + '%';
+
+          if(prog == "progress_certificate")
+            cert_transferred = true;
+          else
+            key_transferred = true;
+
+          if(cert_transferred == true && key_transferred == true)
+          {
+              document.getElementById("reboot").innerHTML="Configure WiFi to complete the procedure";
+          }
+        }
+        else
+        {
+          node.style.width = new_progress_bar_position  + '%';
+          console.log("Updating progress");
+          document.getElementById(trans).innerHTML=("Transferring "+ transferring_stage.toString() + "%" );
+        }
+      }
+      function send_file_in_chunks(id){
+        var blobs = [];
+        var blob;
+        var xhr;
+        var total = 0;
+        var chunk_count = 0;
+        var image = "certificate";
+        var button = "upload_certificate_button";
+        var prog = "progress_certificate";
+        var trans = "certificate_transfer_complete";
+        if(id == 2)
+        {
+            image = "key";
+            button = "upload_key_button";
+            prog = "progress_key";
+            trans = "key_transfer_complete";
+        }
+        var file = document.getElementById(image).files[0];
+        var bytes_per_chunk = 1024;
+        var start = 0;
+        var end = bytes_per_chunk;
+        var size = file.size;
+        var upgrade_chunk_url_with_query;
+        var current_pos = 0;
+        if (window.XMLHttpRequest)
+        {
+          xhr = new XMLHttpRequest();
+        }
+        else
+        {
+          xhr = new ActiveXObject("Microsoft.XMLHTTP");
+        }
+        upgrade_chunk_url_with_query = "upgrade_chunk.html" + "?" + "file=" + image + "&" + "offset=" + current_pos + "&" + "filesize=" + size;
+        xhr.open('POST', upgrade_chunk_url_with_query , true);
+        xhr.timeout = 2000;
+        xhr.onreadystatechange = send_function;
+        function send_function()
+        {
+          if ((xhr.readyState==4 && xhr.status==200))
+          {
+            current_pos = parseInt(xhr.responseText);
+            console.log("Response received" + current_pos);
+            progress(prog, current_pos, file.size, trans );
+            if( current_pos != file.size)
+            {
+              if (window.XMLHttpRequest)
+              {
+                xhr = new XMLHttpRequest();
+              }
+              else
+              {
+                xhr = new ActiveXObject("Microsoft.XMLHTTP");
+              }
+              xhr.onreadystatechange = send_function;
+              upgrade_chunk_url_with_query = "upgrade_chunk.html" + "?" + "file=" + image + "&" + "offset=" + current_pos + "&" + "filesize=" + file.size;
+              xhr.open('POST', upgrade_chunk_url_with_query, true);
+              xhr.timeout = 4000;
+              chunk_count++;
+              console.log("Sending" + chunk_count);
+              xhr.send(file.slice(current_pos, ( current_pos + 1024 )));
+            }
+          }
+          else
+          {
+            if ( (xhr.readyState==4 && xhr.status==0) )
+            {
+              if (window.XMLHttpRequest)
+              {
+                xhr = new XMLHttpRequest();
+              }
+              else
+              {
+                xhr = new ActiveXObject("Microsoft.XMLHTTP");
+              }
+              xhr.onreadystatechange = send_function;
+              upgrade_chunk_url_with_query = "upgrade_chunk.html" + "?" + "file=" + image + "&" + "offset=" + current_pos + "&" + "filesize=" + file.size;
+              xhr.open('POST', upgrade_chunk_url_with_query, true);
+              xhr.timeout = 4000;
+              console.log("Resending after comms failure" + chunk_count + total );
+              xhr.send(file.slice(current_pos, ( current_pos + 1024 )));
+            }
+            else
+            {
+              console.log("Status =" + xhr.readyState + "  " + xhr.status );
+            }
+          }
+        }
+        xhr.send(file.slice(0, 1024));
+      }
+      trigger_for_upgrade = document.getElementById("upgrade_certificate_button");
+      control = document.getElementById("certificate");
+      console.log("Here 2");
+</script>
+<script>
+        function update_settings(){
+            var thing, url, msg;
+            thing = document.getElementById('thing').value;
+            msg = document.getElementById("save_message");
+            url = "configuration_settings.html?mode=set" + "&thing=" + thing;
+            var xhttp = new XMLHttpRequest();
+              xhttp.onreadystatechange = function() {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                  msg.innerHTML = "Settings saved successfully";
+                  setTimeout(function(){
+                    msg.innerHTML = "";
+                  },5000);
+                }
+              }
+              xhttp.open("POST", url, true);
+              xhttp.send();
+        }
+
+        function get_settings(){
+            var url = "configuration_settings.html?mode=get";
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (xhttp.readyState == 4 && xhttp.status == 200) {
+                  document.getElementById('thing').value = xhttp.responseText;
+                  setTimeout(function(){
+                    msg.innerHTML = "";
+                  },5000);
+                }
+              }
+              xhttp.open("POST", url, true);
+              xhttp.send();
+        }
+
+</script>
+</head>
+
+<div width="98%">
+<table border='0' cellpadding='0' cellspacing='0' width="98%">
+ <tr style="border-collapse: collapse; padding: 0;">
+   <td style="width:20px"></td>
+   <td style="width:117px"><img src="../../images/brcmlogo.png" alt="Broadcom Logo" /></td>
+   <td style="width:20px;background-image:url('../../images/brcmlogo_line.png');"></td>
+   <td style="vertical-align:middle; text-align:center; font: bold 25px/100% Verdana, Arial, Helvetica, sans-serif;background-image:url('../../images/brcmlogo_line.png');">
+   WICED&trade; AWS IOT Service
+   </td>
+   <td style="width:137px;background-image:url('../../images/brcmlogo_line.png');"></td>
+ </tr>
+ <tr><td>&nbsp;&nbsp;&nbsp;</td></tr>
+</table>
+
+</div>
+<div class="wrapper">
+<div class="container">
+   <body onload="get_settings()">
+   <div id="settings" class="settings">
+   <fieldset align ="center" style = "border: 1px solid rgb(255,232,57);width: 60%;margin:auto;margin-top:3%; border-radius: 5px;padding: 15px;">
+      <legend style="font: bold 15px/100% Verdana, Arial, Helvetica, sans-serif;">Configuration Settings : </legend>
+        <label for="thing" style="padding-right:1%;font: bold 15px/100% Verdana, Arial, Helvetica, sans-serif;">Thing Name</label>
+        <input id="thing" type="text" style="margin-right:8%" placeholder="thing-name" />
+        <br/>
+        <br/>
+        <Button id="save_settings" class="save_settings" onclick="update_settings()">Save Settings</Button>
+        <p id="save_message"></p> 
+        </fieldset>
+        </div>
+      <br/>
+      <br/>
+    
+    <fieldset align ="center" style = "border: 1px solid rgb(255,232,57);width: 60%;margin:auto;">
+    <legend style="font: bold 15px/100% Verdana, Arial, Helvetica, sans-serif;"> Upload Certificate and Key :</legend>
+    <div class="upload_certificate" style="padding-top:35px">
+      <input class="file_selector" type="file" name="Select certificate" id="certificate"></input>
+      <button class= "upload_certificate_button" type="button" id="upgrade_certificate_button" onclick="send_file_in_chunks(1)" >Upload Certificate</button>
+      <div id="progress_plane" style=" background-color:rgba(165, 167, 169, 0.39); border-radius: 10px; margin-left:27%; margin-top:2%; border: 1px solid rgba(0, 58, 255, 0.93); width:45%; height:15px; font-family: arial, arial, arial; top:10; left:10; position:relative;"/>
+      <div id="progress_certificate" style=" border-radius: 10px; height:100%; width:0px; background-color:#0065E9; top:10; left:10;"></div>
+      <h5 class="one" id = "certificate_transfer_complete"></h5>
+      </div>
+      <br/>
+      <br/>
+      
+      <div class="upload_key">
+      <input class="file_selector" type="file" name="Select key" id="key"></input>
+      <button class= "upload_key_button" type="button" id="upload_key_button" onclick="send_file_in_chunks(2)" >Upload key</button>
+      <div id="progress_plane" style=" background-color:rgba(165, 167, 169, 0.39); border-radius: 10px;margin-left:27%; margin-top:2%; border: 1px solid rgba(0, 58, 255, 0.93); width:45%; height:15px; font-family: arial, arial, arial; top:10; left:10; position:relative;"/>
+      <div id="progress_key" style=" border-radius: 10px; height:100%; width:0px; background-color:#0065E9; top:10; left:10;"></div>
+      <h5 class="one" id = "key_transfer_complete"></h5>
+      </div>
+      
+      <br/>
+      <br/>
+      <br/>
+      <h4 class="one" id = "reboot"></h4>
+      <input type="button" class ="btn" value="Wi-Fi Setup >" onclick="document.location.href='scan_page_outer.html'" />
+      <br/>
+      <br/>
+      </frameset>
+      </body>
+      
+      </div>
+      </div>
+</html>
