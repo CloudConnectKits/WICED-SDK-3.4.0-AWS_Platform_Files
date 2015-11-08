@@ -1,5 +1,4 @@
-# Getting Started Guide
-#### Note! For in-depth hardware and software documentation, please goto : 
+#### Note! For hardware and software documentation plus in-depth Getting Started Guide, please goto : 
 ##### http://cloudconnectkits.org/product/avnet-bcm4343w-iot-starter-kit
 
 # AWS IOT Demo applications
